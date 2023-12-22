@@ -15,13 +15,14 @@
     ]
     classifiers = [
         "Development Status :: 4 - Beta",
-        "Intended Audience :: Telecommunications",
+        "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Operating System :: MacOS",
         "Operating System :: POSIX :: Linux",
-        "Programming Language :: Python",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python",
+        "Topic :: Communications :: Ham Radio",
     ]
 
 [tool.setuptools_scm]
