@@ -3,7 +3,7 @@
 ## Amateur Radio Country Files
 
 ## Example
-```
+```python
 In [1]: from DXEntity import DXCC
 In [2]: dx = DXCC()
 In [3]: dx.lookup('W1AW')
