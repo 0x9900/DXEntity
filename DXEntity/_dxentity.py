@@ -15,6 +15,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Callable, DefaultDict
 from urllib.error import HTTPError
 from urllib.request import urlretrieve
 
@@ -49,16 +50,18 @@ class DXCCRecord:  # pylint: disable=too-many-instance-attributes
 class DXCC:
   # pylint: disable=method-hidden
 
-  def __init__(self, db_path=CTY_HOME, cache_size=LRU_CACHE_SIZE):
-    self._entities = defaultdict(set)
-    self._max_len = 0
-    self._get_prefix = lru_cache(maxsize=cache_size)(self._get_prefix)
-    self._db = os.path.join(os.path.expanduser(db_path), CTY_DB)
-    cty_file = os.path.join(os.path.expanduser(db_path), CTY_FILE)
+  def __init__(self, db_path: str = CTY_HOME, cache_size: int = LRU_CACHE_SIZE,
+               cache_expire: int = CTY_EXPIRE):
+    cty_file: str = os.path.join(os.path.expanduser(db_path), CTY_FILE)
+
+    self._max_len: int = 0
+    self.get_prefix: Callable = lru_cache(maxsize=cache_size)(self._get_prefix)
+    self._db: str = os.path.join(os.path.expanduser(db_path), CTY_DB)
+    self._entities: DefaultDict[str, set] = defaultdict(set)
 
     try:
       fstat = os.stat(self._db)
-      if fstat.st_mtime + CTY_EXPIRE > time.time():
+      if fstat.st_mtime + cache_expire > time.time():
         logging.info('Using DXCC cache %s', self._db)
         with dbm.open(self._db, 'r') as cdb:
           self._entities, self._max_len = marshal.loads(cdb['_meta_data_'])
@@ -81,10 +84,10 @@ class DXCC:
         self._entities[val['Country']].add(key)
       cdb['_meta_data_'] = marshal.dumps([dict(self._entities), self._max_len])
 
-  def lookup(self, call):
+  def lookup(self, call: str) -> DXCCRecord:
     return self._get_prefix(call)
 
-  def _get_prefix(self, call):
+  def _get_prefix(self, call: str) -> DXCCRecord:
     call = call.upper()
     prefixes = list({call[:c] for c in range(self._max_len, 0, -1)})
     prefixes.sort(key=lambda x: -len(x))
@@ -97,28 +100,28 @@ class DXCC:
   def cache_info(self):
     return self._get_prefix.cache_info()
 
-  def isentity(self, country):
+  def isentity(self, country: str) -> bool:
     if country in self._entities:
       return True
     return False
 
   @property
-  def entities(self):
+  def entities(self) -> DefaultDict[str, set]:
     return self._entities
 
-  def get_entity(self, key):
+  def get_entity(self, key: str) -> set:
     if key in self._entities:
       return self._entities[key]
     raise KeyError(f'Entity {key} not found')
 
-  def __str__(self):
+  def __str__(self) -> str:
     return f"{self.__class__} {id(self)} ({self._db})"
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return str(self)
 
   @staticmethod
-  def load_cty(cty_file):
+  def load_cty(cty_file: str):
     cty_tmp = cty_file + '.tmp'
     try:
       urlretrieve(CTY_URL, cty_tmp)
@@ -127,4 +130,3 @@ class DXCC:
       os.rename(cty_tmp, cty_file)
     except HTTPError as err:
       logging.error(err)
-      return
