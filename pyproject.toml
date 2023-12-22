@@ -1,13 +1,14 @@
 [build-system]
     build-backend = "setuptools.build_meta"
-    requires = ["setuptools", "setuptools-scm", "wheel"]
+    requires = ["setuptools", "setuptools_scm[toml]", "wheel"]
+
 
 [project]
     name = "DXEntity"
     readme = "README.md"
     description = "The DXEntity API return location information for an amateur radio call sign."
     license = {file = "LICENSE.md"}
-    version = "0.1.0"
+    dynamic = ["version"]
     requires-python = ">=3.10"
     authors = [
         { name = "Fred C." },
@@ -22,6 +23,10 @@
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
     ]
+
+[tool.setuptools_scm]
+    write_to = "DXEntity/_version.py"
+
 
 [project.urls]
     Source = "https://github.com/0x9900/DXEntity"
