@@ -98,6 +98,7 @@ class DXCC:
     raise KeyError(f"{call} not found")
 
   def cache_info(self):
+    # pylint: disable=no-member
     return self._get_prefix.cache_info()
 
   def isentity(self, country: str) -> bool:
