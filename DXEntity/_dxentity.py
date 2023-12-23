@@ -25,7 +25,7 @@ CTY_FILE = "cty.plist"
 CTY_DB = "cty.db"
 CTY_EXPIRE = 86400 * 7          # One week
 
-LRU_CACHE_SIZE = 8192
+LRU_CACHE_SIZE = 2048
 
 
 @dataclass(slots=True)
@@ -85,7 +85,7 @@ class DXCC:
       cdb['_meta_data_'] = marshal.dumps([dict(self._entities), self._max_len])
 
   def lookup(self, call: str) -> DXCCRecord:
-    return self._get_prefix(call)
+    return self.get_prefix(call)
 
   def _get_prefix(self, call: str) -> DXCCRecord:
     call = call.upper()
@@ -99,7 +99,7 @@ class DXCC:
 
   def cache_info(self):
     # pylint: disable=no-member
-    return self._get_prefix.cache_info()
+    return self.get_prefix.cache_info()
 
   def isentity(self, country: str) -> bool:
     if country in self._entities:
