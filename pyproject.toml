@@ -7,7 +7,7 @@
     name = "DXEntity"
     readme = "README.md"
     description = "The DXEntity API return location information for an amateur radio call sign."
-    license = {file = "LICENSE.md"}
+    license = {file = "LICENSE"}
     dynamic = ["version"]
     requires-python = ">=3.10"
     authors = [

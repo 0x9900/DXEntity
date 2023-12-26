@@ -14,18 +14,18 @@ import plistlib
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import lru_cache
+from functools import _CacheInfo, _lru_cache_wrapper, lru_cache
 from typing import Callable, DefaultDict
 from urllib.error import HTTPError
 from urllib.request import urlretrieve
 
-CTY_URL = "https://www.country-files.com/cty/cty.plist"
-CTY_HOME = "/var/tmp"
-CTY_FILE = "cty.plist"
-CTY_DB = "cty.db"
-CTY_EXPIRE = 86400 * 7          # One week
+CTY_URL: str = "https://www.country-files.com/cty/cty.plist"
+CTY_HOME: str = "/var/tmp"
+CTY_FILE: str = "cty.plist"
+CTY_DB: str = "cty.db"
+CTY_EXPIRE: int = 86400 * 7          # One week
 
-LRU_CACHE_SIZE = 2048
+LRU_CACHE_SIZE: int = 2048
 
 
 @dataclass(slots=True)
@@ -41,21 +41,25 @@ class DXCCRecord:  # pylint: disable=too-many-instance-attributes
   gmtoffset: int
   exactcallsign: bool
 
-  def __init__(self, **kwargs):
+  def __init__(self, **kwargs) -> None:
     kwargs = {k.lower(): v for k, v in kwargs.items()}
     for key in DXCCRecord.__slots__:  # pylint: disable=no-member
       setattr(self, key, kwargs[key])
+
+
+CACHE_TYPE = Callable[[_lru_cache_wrapper], DXCCRecord]
+CacheInfo = _CacheInfo
 
 
 class DXCC:
   # pylint: disable=method-hidden
 
   def __init__(self, db_path: str = CTY_HOME, cache_size: int = LRU_CACHE_SIZE,
-               cache_expire: int = CTY_EXPIRE):
+               cache_expire: int = CTY_EXPIRE) -> None:
     cty_file: str = os.path.join(os.path.expanduser(db_path), CTY_FILE)
 
     self._max_len: int = 0
-    self.get_prefix: Callable = lru_cache(maxsize=cache_size)(self._get_prefix)
+    self.lookup: CACHE_TYPE = lru_cache(maxsize=cache_size)(self._get_prefix)
     self._db: str = os.path.join(os.path.expanduser(db_path), CTY_DB)
     self._entities: DefaultDict[str, set] = defaultdict(set)
 
@@ -84,9 +88,6 @@ class DXCC:
         self._entities[val['Country']].add(key)
       cdb['_meta_data_'] = marshal.dumps([dict(self._entities), self._max_len])
 
-  def lookup(self, call: str) -> DXCCRecord:
-    return self.get_prefix(call)
-
   def _get_prefix(self, call: str) -> DXCCRecord:
     call = call.upper()
     prefixes = list({call[:c] for c in range(self._max_len, 0, -1)})
@@ -97,9 +98,9 @@ class DXCC:
           return DXCCRecord(**marshal.loads(cdb[prefix]))
     raise KeyError(f"{call} not found")
 
-  def cache_info(self):
+  def cache_info(self) -> CacheInfo:
     # pylint: disable=no-member
-    return self.get_prefix.cache_info()
+    return self.lookup.cache_info()  # type: ignore
 
   def isentity(self, country: str) -> bool:
     if country in self._entities:
