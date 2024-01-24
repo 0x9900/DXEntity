@@ -9,23 +9,25 @@
 import dbm
 import logging
 import marshal
-import os
 import plistlib
 import time
+import urllib
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import _CacheInfo, _lru_cache_wrapper, lru_cache
-from typing import Callable, DefaultDict
-from urllib.error import HTTPError
-from urllib.request import urlretrieve
+from pathlib import Path
+from typing import Callable, DefaultDict, Dict
 
 CTY_URL: str = "https://www.country-files.com/cty/cty.plist"
-CTY_HOME: str = "/var/tmp"
-CTY_FILE: str = "cty.plist"
-CTY_DB: str = "cty.db"
+CTY_DB: str = Path.home() / ".local/cty"
 CTY_EXPIRE: int = 86400 * 7          # One week
 
 LRU_CACHE_SIZE: int = 2048
+TRANSLATOR = ''.maketrans(
+  'abcdefghijklmnopqrstuvwxyz',
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  ' !"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
+)
 
 
 @dataclass(slots=True)
@@ -54,39 +56,48 @@ CacheInfo = _CacheInfo
 class DXCC:
   # pylint: disable=method-hidden
 
-  def __init__(self, db_path: str = CTY_HOME, cache_size: int = LRU_CACHE_SIZE,
+  def __init__(self, db_path: Path = CTY_DB, cache_size: int = LRU_CACHE_SIZE,
                cache_expire: int = CTY_EXPIRE) -> None:
-    cty_file: str = os.path.join(os.path.expanduser(db_path), CTY_FILE)
+    if not db_path.parent.exists():
+      db_path.parent.mkdir(parents=True)
 
     self._max_len: int = 0
     self.lookup: CACHE_TYPE = lru_cache(maxsize=cache_size)(self._get_prefix)
-    self._db: str = os.path.join(os.path.expanduser(db_path), CTY_DB)
-    self._entities: DefaultDict[str, set] = defaultdict(set)
+    self._db: str = str(db_path)
 
     try:
-      fstat = os.stat(self._db)
-      if fstat.st_mtime + cache_expire > time.time():
+      with dbm.open(self._db, 'r') as cdb:
+        age = marshal.loads(cdb.get('__age__', 0))
+    except dbm.error:
+      age = 0
+      logging.error('DXEntity cache not found or expired')
+
+    if age + cache_expire > time.time():
+      try:
         logging.info('Using DXCC cache %s', self._db)
         with dbm.open(self._db, 'r') as cdb:
-          self._entities, self._max_len = marshal.loads(cdb['_meta_data_'])
+          self._max_len = marshal.loads(cdb['__max_len__'])
         return
-    except FileNotFoundError:
-      logging.error('DXEntity cache not found')
-    except dbm.error as err:
-      logging.error(err)
+      except dbm.error as err:
+        logging.error('DXEntity cache error: %s', err)
 
-    logging.info('Download %s', cty_file)
-    self.load_cty(cty_file)
-    with open(cty_file, 'rb') as fdc:
-      cty_data = plistlib.load(fdc)
+    logging.info('Download %s', CTY_URL)
+
+    with urllib.request.urlopen(CTY_URL) as result:
+      raw_data = result.read()
+      cty_data = plistlib.loads(raw_data)
     self._max_len = max(len(k) for k in cty_data)
 
     logging.info('Create cty cache: %s', self._db)
+    entities: DefaultDict[str, set] = defaultdict(set)
     with dbm.open(self._db, 'c') as cdb:
       for key, val in cty_data.items():
         cdb[key] = marshal.dumps(val)
-        self._entities[val['Country']].add(key)
-      cdb['_meta_data_'] = marshal.dumps([dict(self._entities), self._max_len])
+        country = val['Country'].translate(TRANSLATOR)
+        entities[country].add(key)
+      cdb['__age__'] = marshal.dumps(int(time.time()))
+      cdb['__max_len__'] = marshal.dumps(self._max_len)
+      cdb['__entities__'] = marshal.dumps(dict(entities))
 
   def _get_prefix(self, call: str) -> DXCCRecord:
     call = call.upper()
@@ -103,17 +114,21 @@ class DXCC:
     return self.lookup.cache_info()  # type: ignore
 
   def isentity(self, country: str) -> bool:
-    if country in self._entities:
+    country = country.translate(TRANSLATOR)
+    if country in self.entities:
       return True
     return False
 
   @property
-  def entities(self) -> DefaultDict[str, set]:
-    return self._entities
+  def entities(self) -> Dict[str, set]:
+    with dbm.open(self._db, 'r') as cdb:
+      return marshal.loads(cdb.get('__entities__'))
 
   def get_entity(self, key: str) -> set:
-    if key in self._entities:
-      return self._entities[key]
+    _entities = self.entities
+    _key = key.translate(TRANSLATOR)
+    if _key in _entities:
+      return _entities[_key]
     raise KeyError(f'Entity {key} not found')
 
   def __str__(self) -> str:
@@ -121,14 +136,3 @@ class DXCC:
 
   def __repr__(self) -> str:
     return str(self)
-
-  @staticmethod
-  def load_cty(cty_file: str):
-    cty_tmp = cty_file + '.tmp'
-    try:
-      urlretrieve(CTY_URL, cty_tmp)
-      if os.path.exists(cty_file):
-        os.unlink(cty_file)
-      os.rename(cty_tmp, cty_file)
-    except HTTPError as err:
-      logging.error(err)
