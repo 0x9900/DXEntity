@@ -11,16 +11,19 @@ import logging
 import marshal
 import plistlib
 import time
-import urllib
 from collections import defaultdict
+from collections.abc import Buffer  # pylint: disable=unused-import
 from dataclasses import dataclass
 from functools import _CacheInfo, _lru_cache_wrapper, lru_cache
 from pathlib import Path
-from typing import Callable, DefaultDict, Dict
+from typing import Callable, DefaultDict, cast
+from urllib import request
 
 CTY_URL: str = "https://www.country-files.com/cty/cty.plist"
-CTY_DB: str = Path.home() / ".local/cty"
+CTY_DB: Path = Path.home() / ".local/cty"
 CTY_EXPIRE: int = 86400 * 7          # One week
+
+ZERO = b'\xe9\x00\x00\x00\x00'
 
 LRU_CACHE_SIZE: int = 2048
 TRANSLATOR = ''.maketrans(
@@ -67,7 +70,7 @@ class DXCC:
 
     try:
       with dbm.open(self._db, 'r') as cdb:
-        age = marshal.loads(cdb.get('__age__', 0))
+        age = marshal.loads(cdb.get('__age__', ZERO))
     except dbm.error:
       age = 0
       logging.error('DXEntity cache not found or expired')
@@ -83,7 +86,7 @@ class DXCC:
 
     logging.info('Download %s', CTY_URL)
 
-    with urllib.request.urlopen(CTY_URL) as result:
+    with request.urlopen(CTY_URL) as result:
       raw_data = result.read()
       cty_data = plistlib.loads(raw_data)
     self._max_len = max(len(k) for k in cty_data)
@@ -120,9 +123,10 @@ class DXCC:
     return False
 
   @property
-  def entities(self) -> Dict[str, set]:
+  def entities(self) -> dict[str, set]:
     with dbm.open(self._db, 'r') as cdb:
-      return marshal.loads(cdb.get('__entities__'))
+      ret = cdb.get('__entities__')
+      return marshal.loads(cast('Buffer', ret))
 
   def get_entity(self, key: str) -> set:
     _entities = self.entities
