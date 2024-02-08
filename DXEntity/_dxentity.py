@@ -12,12 +12,13 @@ import marshal
 import plistlib
 import time
 from collections import defaultdict
-from collections.abc import Buffer  # pylint: disable=unused-import
 from dataclasses import dataclass
 from functools import _CacheInfo, _lru_cache_wrapper, lru_cache
 from pathlib import Path
-from typing import Callable, DefaultDict, cast
+from typing import Callable, DefaultDict, TypeAlias, cast
 from urllib import request
+
+Buffer: TypeAlias = bytes
 
 CTY_URL: str = "https://www.country-files.com/cty/cty.plist"
 CTY_DB: Path = Path.home() / ".local/cty"
