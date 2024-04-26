@@ -28,7 +28,6 @@
 [tool.setuptools_scm]
     write_to = "DXEntity/_version.py"
 
-
 [project.urls]
     Source = "https://github.com/0x9900/DXEntity"
     Tracker = "https://github.com/0x9900/DXEntity/issues"

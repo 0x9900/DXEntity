@@ -66,7 +66,7 @@ class DXCC:
       db_path.parent.mkdir(parents=True)
 
     self._max_len: int = 0
-    self.lookup: CACHE_TYPE = lru_cache(maxsize=cache_size)(self._get_prefix)
+    self._lookup: CACHE_TYPE = lru_cache(maxsize=cache_size)(self._get_prefix)
     self._db: str = str(db_path)
 
     try:
@@ -103,8 +103,11 @@ class DXCC:
       cdb['__max_len__'] = marshal.dumps(self._max_len)
       cdb['__entities__'] = marshal.dumps(dict(entities))
 
-  def _get_prefix(self, call: str) -> DXCCRecord:
+  def lookup(self, call: str) -> DXCCRecord:
     call = call.upper()
+    return self._lookup(call)
+
+  def _get_prefix(self, call: str) -> DXCCRecord:
     prefixes = list({call[:c] for c in range(self._max_len, 0, -1)})
     prefixes.sort(key=lambda x: -len(x))
     with dbm.open(self._db, 'r') as cdb:
@@ -115,7 +118,7 @@ class DXCC:
 
   def cache_info(self) -> CacheInfo:
     # pylint: disable=no-member
-    return self.lookup.cache_info()  # type: ignore
+    return self._lookup.cache_info()  # type: ignore
 
   def isentity(self, country: str) -> bool:
     country = country.translate(TRANSLATOR)
