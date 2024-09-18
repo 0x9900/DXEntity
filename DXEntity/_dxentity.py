@@ -21,7 +21,7 @@ from urllib import request
 Buffer: TypeAlias = bytes
 
 CTY_URL: str = "https://www.country-files.com/cty/cty.plist"
-CTY_DB: Path = Path.home() / ".local/cty"
+CTY_DB: Path = Path("/tmp/cty.dat")
 CTY_EXPIRE: int = 86400 * 7          # One week
 
 ZERO = b'\xe9\x00\x00\x00\x00'
