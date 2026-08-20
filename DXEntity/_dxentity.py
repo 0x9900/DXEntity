@@ -50,7 +50,10 @@ class DXCCRecord:  # pylint: disable=too-many-instance-attributes
   def __init__(self, **kwargs) -> None:
     kwargs = {k.lower(): v for k, v in kwargs.items()}
     for key in DXCCRecord.__slots__:  # pylint: disable=no-member
-      setattr(self, key, kwargs[key])
+      if key == 'longitude':
+        setattr(self, key, kwargs[key] * -1)
+      else:
+        setattr(self, key, kwargs[key])
 
 
 CACHE_TYPE = Callable[[_lru_cache_wrapper], DXCCRecord]
